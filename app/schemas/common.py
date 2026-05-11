@@ -1,15 +1,11 @@
 from enum import Enum
 
 
-class Category(str, Enum):
-    TOP = "top"
-    BOTTOM = "bottom"
-    OUTER = "outer"
-    SHOES = "shoes"
-    HAT = "hat"
-
-
-class MimeType(str, Enum):
-    JPEG = "image/jpeg"
-    PNG = "image/png"
-    WEBP = "image/webp"
+class OutfitPart(str, Enum):
+    FULL = "FULL"
+    TOP = "TOP"
+    BOTTOM = "BOTTOM"
+    OUTER = "OUTER"
+    DRESS = "DRESS"
+    SHOES = "SHOES"
+    HAT = "HAT"

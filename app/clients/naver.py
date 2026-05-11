@@ -18,6 +18,7 @@ class ShopItem:
     price: int
     mall_name: str
     category: str
+    brand: str
 
 
 def _strip(text: str) -> str:
@@ -54,6 +55,7 @@ async def search_shop(query: str, display: int | None = None) -> list[ShopItem]:
                 price=price,
                 mall_name=raw.get("mallName", ""),
                 category=raw.get("category1", ""),
+                brand=_strip(raw.get("brand") or raw.get("maker") or ""),
             )
         )
     return items
