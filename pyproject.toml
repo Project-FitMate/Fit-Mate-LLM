@@ -1,0 +1,29 @@
+[project]
+name = "fit-mate-llm"
+version = "0.1.0"
+description = "FitMate AI service: LLM-based search query generation and Gemini-powered virtual fitting"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "google-genai>=0.3",
+    "httpx>=0.27",
+    "pyyaml>=6.0",
+    "python-multipart>=0.0.12",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-mock>=3.14",
+    "respx>=0.21",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: tests that hit real external APIs (skipped without keys)",
+]
+asyncio_mode = "auto"
