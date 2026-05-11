@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
-from app.core.auth import require_api_key
 from app.schemas.fitting import FittingRequest, FittingResponse
 from app.services import fitter
 
-router = APIRouter(dependencies=[Depends(require_api_key)])
+router = APIRouter()
 
 
 @router.post("/fitting", response_model=FittingResponse)

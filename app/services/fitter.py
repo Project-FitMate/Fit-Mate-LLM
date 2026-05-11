@@ -9,13 +9,37 @@ from app.prompts import load
 from app.schemas.fitting import FittingRequest, FittingResponse
 
 
+def _detect_mime(data: bytes) -> str:
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if len(data) >= 12 and data[0:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="unsupported image format (expected png/jpeg/webp)",
+    )
+
+
+def _mime_of(b64: str) -> str:
+    try:
+        return _detect_mime(base64.b64decode(b64, validate=False)[:32])
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="invalid base64 image",
+        ) from e
+
+
 async def fit(req: FittingRequest) -> FittingResponse:
-    template_name = req.prompt_template or "fitting_default"
-    template = load(template_name)
+    template = load("fitting_default")
     system, user = template.render()
 
-    images = [(req.user_image, req.mime_type.value)]
-    images.extend((img, req.mime_type.value) for img in req.item_images)
+    images = [
+        (req.user_image, _mime_of(req.user_image)),
+        (req.outfit_image, _mime_of(req.outfit_image)),
+    ]
 
     try:
         result = await asyncio.wait_for(
@@ -33,7 +57,4 @@ async def fit(req: FittingRequest) -> FittingResponse:
             detail="fitting generation timed out",
         ) from e
 
-    return FittingResponse(
-        result_image=base64.b64encode(result.data).decode("ascii"),
-        mime_type=result.mime_type,
-    )
+    return FittingResponse(image=base64.b64encode(result.data).decode("ascii"))
