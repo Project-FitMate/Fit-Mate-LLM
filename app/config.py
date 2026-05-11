@@ -8,8 +8,6 @@ class Settings(BaseSettings):
     port: int = 8000
     log_level: str = "INFO"
 
-    api_key: str  # X-API-Key shared secret with Next.js backend
-
     gemini_api_key: str
     gemini_text_model: str = "gemini-2.5-flash"
     gemini_image_model: str = "gemini-2.5-flash-image"
