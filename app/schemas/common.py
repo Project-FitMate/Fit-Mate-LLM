@@ -9,3 +9,9 @@ class OutfitPart(str, Enum):
     DRESS = "DRESS"
     SHOES = "SHOES"
     HAT = "HAT"
+
+
+class MimeType(str, Enum):
+    JPEG = "image/jpeg"
+    PNG = "image/png"
+    WEBP = "image/webp"
