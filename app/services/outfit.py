@@ -1,3 +1,4 @@
+import asyncio
 import base64
 
 from fastapi import HTTPException, status
@@ -59,7 +60,11 @@ async def get_outfits(req: RecommendRequest) -> list[OutfitItem]:
         min_price=req.min_price,
         max_price=req.max_price,
     )
-    query = gemini.generate_text(
+    # google-genai's generate_content is sync and manages its own httpx Client;
+    # calling it directly from FastAPI's async loop closes that client mid-flight.
+    # Mirror fitter.py and run it in a worker thread.
+    query = await asyncio.to_thread(
+        gemini.generate_text,
         system_prompt=system,
         user_prompt=user,
         images=[(req.user_image, mime)],

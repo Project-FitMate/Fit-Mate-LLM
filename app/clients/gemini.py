@@ -13,8 +13,18 @@ class GeneratedImage:
     mime_type: str
 
 
+_CLIENT: genai.Client | None = None
+
+
 def _client() -> genai.Client:
-    return genai.Client(api_key=settings.gemini_api_key)
+    # Cache the client at module scope. google-genai's sync Client owns an
+    # httpx.Client that gets closed when the Client is garbage-collected; a
+    # fresh Client per call can be collected mid-request and surface as
+    # "Cannot send a request, as the client has been closed."
+    global _CLIENT
+    if _CLIENT is None:
+        _CLIENT = genai.Client(api_key=settings.gemini_api_key)
+    return _CLIENT
 
 
 def _image_part(data_b64: str, mime_type: str) -> types.Part:
