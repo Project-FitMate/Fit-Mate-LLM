@@ -85,4 +85,10 @@ async def get_outfits(req: RecommendRequest) -> list[OutfitItem]:
                 link=it.product_url,
             )
         )
+    print(
+        f"[outfit] query={query!r} part={req.part.value} "
+        f"price_range=[{req.min_price},{req.max_price}] "
+        f"shop_items={len(shop_items)} filtered={len(results)}",
+        flush=True,
+    )
     return results
