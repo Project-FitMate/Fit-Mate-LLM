@@ -36,9 +36,8 @@ async def fit(req: FittingRequest) -> FittingResponse:
     template = load("fitting_default")
     system, user = template.render()
 
-    images = [
-        (req.user_image, _mime_of(req.user_image)),
-        (req.outfit_image, _mime_of(req.outfit_image)),
+    images = [(req.user_image, _mime_of(req.user_image))] + [
+        (o, _mime_of(o)) for o in req.outfit_images
     ]
 
     try:
