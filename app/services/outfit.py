@@ -54,41 +54,56 @@ async def get_outfits(req: RecommendRequest) -> list[OutfitItem]:
     mime = req.user_image_mime_type.value if req.user_image_mime_type else _mime_of(req.user_image)
 
     template = load("query_default")
-    system, user = template.render(
-        part=req.part.value,
-        part_label=_PART_LABEL_KO[req.part],
-        min_price=req.min_price,
-        max_price=req.max_price,
-    )
-    # google-genai's generate_content is sync and manages its own httpx Client;
-    # calling it directly from FastAPI's async loop closes that client mid-flight.
-    # Mirror fitter.py and run it in a worker thread.
-    query = await asyncio.to_thread(
-        gemini.generate_text,
-        system_prompt=system,
-        user_prompt=user,
-        images=[(req.user_image, mime)],
-    )
 
-    shop_items = await naver.search_shop(query)
+    async def _for_part(part: OutfitPart) -> list[OutfitItem]:
+        system, user = template.render(
+            part=part.value,
+            part_label=_PART_LABEL_KO[part],
+            min_price=req.min_price,
+            max_price=req.max_price,
+        )
+        # google-genai's generate_content is sync and manages its own httpx Client;
+        # calling it directly from FastAPI's async loop closes that client mid-flight.
+        # Mirror fitter.py and run it in a worker thread.
+        query = await asyncio.to_thread(
+            gemini.generate_text,
+            system_prompt=system,
+            user_prompt=user,
+            images=[(req.user_image, mime)],
+        )
+
+        shop_items = await naver.search_shop(query)
+
+        items: list[OutfitItem] = []
+        for it in shop_items:
+            if it.price < req.min_price or it.price > req.max_price:
+                continue
+            items.append(
+                OutfitItem(
+                    part=part,
+                    image=it.image_url,
+                    brand=it.brand or it.mall_name,
+                    name=it.title,
+                    price=it.price,
+                    link=it.product_url,
+                )
+            )
+        print(
+            f"[outfit] query={query!r} part={part.value} "
+            f"price_range=[{req.min_price},{req.max_price}] "
+            f"shop_items={len(shop_items)} filtered={len(items)}",
+            flush=True,
+        )
+        return items
+
+    per_part = await asyncio.gather(*(_for_part(part) for part in req.parts))
 
     results: list[OutfitItem] = []
-    for it in shop_items:
-        if it.price < req.min_price or it.price > req.max_price:
-            continue
-        results.append(
-            OutfitItem(
-                image=it.image_url,
-                brand=it.brand or it.mall_name,
-                name=it.title,
-                price=it.price,
-                link=it.product_url,
-            )
-        )
-    print(
-        f"[outfit] query={query!r} part={req.part.value} "
-        f"price_range=[{req.min_price},{req.max_price}] "
-        f"shop_items={len(shop_items)} filtered={len(results)}",
-        flush=True,
-    )
+    seen: set[str] = set()
+    for items in per_part:
+        for item in items:
+            if item.link in seen:
+                continue
+            seen.add(item.link)
+            results.append(item)
     return results
