@@ -13,9 +13,9 @@ async def fit(req: FittingRequest) -> FittingResponse:
     template = load("fitting_default")
     system, user = template.render()
 
-    # Both images are re-encoded to JPEG inside the client, so GIF/WebP product
-    # images (Naver serves these despite .jpg URLs) are accepted here.
-    images = [req.user_image, req.outfit_image]
+    # Both user and outfit images are re-encoded to JPEG inside the client, so
+    # GIF/WebP product images (Naver serves these despite .jpg URLs) are accepted.
+    images = [req.user_image, *req.outfit_images]
 
     try:
         result = await asyncio.wait_for(

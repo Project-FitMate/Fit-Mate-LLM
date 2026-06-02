@@ -26,54 +26,62 @@ async def get_outfits(req: RecommendRequest) -> list[OutfitItem]:
         )
 
     template = load("query_default")
-    system, user = template.render(
-        part=req.part.value,
-        part_label=_PART_LABEL_KO[req.part],
-    )
-    # google-genai's generate_content is sync and manages its own httpx Client;
-    # calling it directly from FastAPI's async loop closes that client mid-flight.
-    # Mirror fitter.py and run it in a worker thread. The image is re-encoded to
-    # JPEG inside the client, so any decodable format is accepted here.
-    try:
+
+    async def _for_part(part: OutfitPart) -> list[OutfitItem]:
+        system, user = template.render(
+            part=part.value,
+            part_label=_PART_LABEL_KO[part],
+            min_price=req.min_price,
+            max_price=req.max_price,
+        )
+        # google-genai's generate_content is sync and manages its own httpx Client;
+        # calling it directly from FastAPI's async loop closes that client mid-flight.
+        # Mirror fitter.py and run it in a worker thread.
         query = await asyncio.to_thread(
             gemini.generate_text,
             system_prompt=system,
             user_prompt=user,
             images=[req.user_image],
         )
-    except (OSError, ValueError) as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="invalid or undecodable user image",
-        ) from e
 
-    # Gemini occasionally returns an empty/whitespace query (e.g. no person in
-    # the photo). An empty query makes Naver reject the request with 400, which
-    # we'd surface as a 502. Fall back to a part-based query so recommendation
-    # still works.
-    query = (query or "").strip()
-    if not query:
-        query = _PART_LABEL_KO[req.part]
+        # Gemini occasionally returns an empty/whitespace query (e.g. no person
+        # in the photo). An empty query makes Naver reject the request with 400,
+        # which we'd surface as a 502. Fall back to a part-based query so
+        # recommendation still works.
+        query = (query or "").strip() or _PART_LABEL_KO[part]
 
-    shop_items = await naver.search_shop(query)
+        shop_items = await naver.search_shop(query)
+
+        items: list[OutfitItem] = []
+        for it in shop_items:
+            if it.price < req.min_price or it.price > req.max_price:
+                continue
+            items.append(
+                OutfitItem(
+                    part=part,
+                    image=it.image_url,
+                    brand=it.brand or it.mall_name,
+                    name=it.title,
+                    price=it.price,
+                    link=it.product_url,
+                )
+            )
+        print(
+            f"[outfit] query={query!r} part={part.value} "
+            f"price_range=[{req.min_price},{req.max_price}] "
+            f"shop_items={len(shop_items)} filtered={len(items)}",
+            flush=True,
+        )
+        return items
+
+    per_part = await asyncio.gather(*(_for_part(part) for part in req.parts))
 
     results: list[OutfitItem] = []
-    for it in shop_items:
-        if it.price < req.min_price or it.price > req.max_price:
-            continue
-        results.append(
-            OutfitItem(
-                image=it.image_url,
-                brand=it.brand or it.mall_name,
-                name=it.title,
-                price=it.price,
-                link=it.product_url,
-            )
-        )
-    print(
-        f"[outfit] query={query!r} part={req.part.value} "
-        f"price_range=[{req.min_price},{req.max_price}] "
-        f"shop_items={len(shop_items)} filtered={len(results)}",
-        flush=True,
-    )
+    seen: set[str] = set()
+    for items in per_part:
+        for item in items:
+            if item.link in seen:
+                continue
+            seen.add(item.link)
+            results.append(item)
     return results

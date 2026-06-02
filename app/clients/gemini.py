@@ -1,5 +1,6 @@
 import base64
 import io
+import threading
 from dataclasses import dataclass
 
 from google import genai
@@ -29,18 +30,22 @@ def _to_jpeg(data: bytes) -> bytes:
         return buf.getvalue()
 
 
-_CLIENT: genai.Client | None = None
+# Cache the client per thread. google-genai's sync Client owns an httpx.Client
+# that gets closed when the Client is garbage-collected; a fresh Client per call
+# can be collected mid-request and surface as "Cannot send a request, as the
+# client has been closed." A single module-scoped client is also unsafe once we
+# fan out parts via asyncio.gather + asyncio.to_thread: concurrent worker threads
+# sharing one sync client close each other's httpx.Client mid-flight. Thread-local
+# caching gives each worker its own long-lived client.
+_LOCAL = threading.local()
 
 
 def _client() -> genai.Client:
-    # Cache the client at module scope. google-genai's sync Client owns an
-    # httpx.Client that gets closed when the Client is garbage-collected; a
-    # fresh Client per call can be collected mid-request and surface as
-    # "Cannot send a request, as the client has been closed."
-    global _CLIENT
-    if _CLIENT is None:
-        _CLIENT = genai.Client(api_key=settings.gemini_api_key)
-    return _CLIENT
+    client = getattr(_LOCAL, "client", None)
+    if client is None:
+        client = genai.Client(api_key=settings.gemini_api_key)
+        _LOCAL.client = client
+    return client
 
 
 def _image_part(data_b64: str) -> types.Part:
