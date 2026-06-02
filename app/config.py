@@ -10,7 +10,10 @@ class Settings(BaseSettings):
 
     gemini_api_key: str
     gemini_text_model: str = "gemini-2.5-flash"
-    gemini_image_model: str = "gemini-2.5-flash-image"
+    # gemini-3-pro-image handles multi-image virtual try-on far more reliably
+    # than 2.5-flash-image (which often returned a collage or the original
+    # photo unchanged).
+    gemini_image_model: str = "gemini-3-pro-image"
 
     naver_client_id: str
     naver_client_secret: str
