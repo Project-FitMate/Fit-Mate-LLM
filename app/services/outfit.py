@@ -26,6 +26,11 @@ async def get_outfits(req: RecommendRequest) -> list[OutfitItem]:
         )
 
     template = load("query_default")
+    keyword_hint = (
+        f"- 사용자가 원하는 키워드: {req.keyword.strip()}"
+        if req.keyword and req.keyword.strip()
+        else ""
+    )
 
     async def _for_part(part: OutfitPart) -> list[OutfitItem]:
         system, user = template.render(
@@ -33,6 +38,7 @@ async def get_outfits(req: RecommendRequest) -> list[OutfitItem]:
             part_label=_PART_LABEL_KO[part],
             min_price=req.min_price,
             max_price=req.max_price,
+            keyword_hint=keyword_hint,
         )
         # google-genai's generate_content is sync and manages its own httpx Client;
         # calling it directly from FastAPI's async loop closes that client mid-flight.
