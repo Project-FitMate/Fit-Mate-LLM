@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     gemini_api_key: str
-    gemini_text_model: str = "gemini-2.5-flash"
+    # gemini-3.1-flash-lite: newer GA model, cheaper + faster than 2.5-flash and
+    # more than enough for short search-keyword generation from the user photo.
+    gemini_text_model: str = "gemini-3.1-flash-lite"
     # gemini-3-pro-image handles multi-image virtual try-on far more reliably
     # than 2.5-flash-image (which often returned a collage or the original
     # photo unchanged).
